@@ -25,12 +25,21 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('abastecimentos') }}">Abastecimentos</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('manutencoes') }}">Manutenções</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('despesas') }}">Despesas</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('receitas') }}">Receitas</a>
+                </li>
             </ul>
         </div>
     </div>
 </nav>
 
-<main class="container mt-4">
+<main class="container mt-4 mb-5">
     {% block content %}{% endblock %}
 </main>
 

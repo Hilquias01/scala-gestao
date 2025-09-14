@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Despesas Gerais - Scala Gestão{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Despesas Gerais</h1>
+    <a href="{{ url_for('adicionar_despesa') }}" class="btn btn-primary">
+        Registrar Nova Despesa
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Data</th>
+                    <th>Descrição</th>
+                    <th>Categoria</th>
+                    <th>Valor (R$)</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for despesa in despesas %}
+                <tr>
+                    <td>{{ despesa.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ despesa.descricao }}</td>
+                    <td>{{ despesa.categoria }}</td>
+                    <td>R$ {{ "%.2f"|format(despesa.valor) }}</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('editar_despesa', id=despesa.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                            <form method="POST" action="{{ url_for('excluir_despesa', id=despesa.id) }}">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('Tem certeza que deseja excluir este registro?')">
+                                    Excluir
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Histórico de Manutenções - Scala Gestão{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Histórico de Manutenções</h1>
+    <a href="{{ url_for('adicionar_manutencao') }}" class="btn btn-primary">
+        Registrar Nova Manutenção
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Data</th>
+                    <th>Veículo</th>
+                    <th>Serviço Realizado</th>
+                    <th>Custo (R$)</th>
+                    <th>KM do Odômetro</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for manutencao in manutencoes %}
+                <tr>
+                    <td>{{ manutencao.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ manutencao.veiculo.placa }}</td>
+                    <td>{{ manutencao.descricao_servico }}</td>
+                    <td>R$ {{ "%.2f"|format(manutencao.custo) }}</td>
+                    <td>{{ manutencao.km_odometro }} km</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('editar_manutencao', id=manutencao.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                            <form method="POST" action="{{ url_for('excluir_manutencao', id=manutencao.id) }}">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('Tem certeza que deseja excluir este registro?')">
+                                    Excluir
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

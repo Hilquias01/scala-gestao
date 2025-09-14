@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Manutenção - Scala Gestão{% endblock %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <h2>Editar Registro de Manutenção</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="id_veiculo" class="form-label">Veículo</label>
+                        <select class="form-select" id="id_veiculo" name="id_veiculo" required>
+                            <option disabled value="">Selecione um veículo...</option>
+                            {% for veiculo in veiculos %}
+                                <option value="{{ veiculo.id }}" {% if veiculo.id == manutencao.id_veiculo %}selected{% endif %}>
+                                    {{ veiculo.placa }} - {{ veiculo.modelo }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="data" class="form-label">Data do Serviço</label>
+                        <input type="date" class="form-control" id="data" name="data" value="{{ manutencao.data.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="descricao_servico" class="form-label">Descrição do Serviço</label>
+                    <textarea class="form-control" id="descricao_servico" name="descricao_servico" rows="3" required>{{ manutencao.descricao_servico }}</textarea>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="custo" class="form-label">Custo Total (R$)</label>
+                        <input type="number" step="0.01" class="form-control" id="custo" name="custo" value="{{ manutencao.custo }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="km_odometro" class="form-label">KM do Odômetro</label>
+                        <input type="number" class="form-control" id="km_odometro" name="km_odometro" value="{{ manutencao.km_odometro }}" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-success w-100">Salvar Alterações</button>
+                <a href="{{ url_for('manutencoes') }}" class="btn btn-secondary w-100 mt-2">Cancelar</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

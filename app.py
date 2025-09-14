@@ -10,15 +10,17 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'sc
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- MODELOS COM RELATIONSHIPS ---
+# --- MODELOS ---
 class Veiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     placa = db.Column(db.String(10), unique=True, nullable=False)
     modelo = db.Column(db.String(100), nullable=False)
     ano = db.Column(db.Integer, nullable=False)
     km_inicial = db.Column(db.Integer, nullable=False)
-    # Relacionamento: Um veículo pode ter vários abastecimentos
-    abastecimentos = db.relationship('Abastecimento', backref='veiculo', lazy=True)
+    
+    abastecimentos = db.relationship('Abastecimento', backref='veiculo', lazy=True, cascade="all, delete-orphan")
+    manutencoes = db.relationship('Manutencao', backref='veiculo', lazy=True, cascade="all, delete-orphan")
+    receitas = db.relationship('Receita', backref='veiculo', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f'<Veiculo {self.placa}>'
@@ -34,7 +36,7 @@ class Funcionario(db.Model):
     salario_base = db.Column(db.Float, nullable=False)
     ajuda_custo_extra = db.Column(db.Float, nullable=True, default=0.0)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
-    # Relacionamento: Um funcionário pode ter vários abastecimentos
+    
     abastecimentos = db.relationship('Abastecimento', backref='funcionario', lazy=True)
 
     def __repr__(self):
@@ -50,12 +52,43 @@ class Abastecimento(db.Model):
     id_funcionario = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
 
     def __repr__(self):
-        return f'<Abastecimento id={self.id} Veiculo id={self.id_veiculo}>'
+        return f'<Abastecimento id={self.id}>'
+
+class Manutencao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.Date, nullable=False)
+    id_veiculo = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    descricao_servico = db.Column(db.Text, nullable=False)
+    custo = db.Column(db.Float, nullable=False)
+    km_odometro = db.Column(db.Integer, nullable=False)
+
+    def __repr__(self):
+        return f'<Manutencao id={self.id}>'
+
+class DespesaGeral(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.Date, nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    categoria = db.Column(db.String(50), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+
+    def __repr__(self):
+        return f'<DespesaGeral id={self.id}>'
+
+class Receita(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.Date, nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    id_veiculo = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=True) # Opcional
+
+    def __repr__(self):
+        return f'<Receita id={self.id}>'
 
 # --- ROTAS DE VEÍCULOS ---
 @app.route('/')
 def home():
-    todos_veiculos = Veiculo.query.all()
+    todos_veiculos = Veiculo.query.order_by(Veiculo.placa).all()
     return render_template('index.html', lista_de_veiculos=todos_veiculos)
 
 @app.route('/veiculo/novo', methods=['GET', 'POST'])
@@ -70,7 +103,6 @@ def adicionar_veiculo():
         db.session.commit()
         return redirect(url_for('home'))
     return render_template('adicionar_veiculo.html')
-
 
 @app.route('/veiculo/editar/<int:id>', methods=['GET', 'POST'])
 def editar_veiculo(id):
@@ -94,7 +126,7 @@ def excluir_veiculo(id):
 # --- ROTAS DE FUNCIONÁRIOS ---
 @app.route('/funcionarios')
 def funcionarios():
-    todos_funcionarios = Funcionario.query.all()
+    todos_funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
     return render_template('funcionarios.html', lista_de_funcionarios=todos_funcionarios)
 
 @app.route('/funcionario/novo', methods=['GET', 'POST'])
@@ -138,11 +170,8 @@ def excluir_funcionario(id):
     return redirect(url_for('funcionarios'))
 
 # --- ROTAS DE ABASTECIMENTO ---
-
-# NOVA ROTA PARA LISTAR ABASTECIMENTOS
 @app.route('/abastecimentos')
 def abastecimentos():
-    # Ordena os abastecimentos pela data mais recente primeiro
     lista_abastecimentos = Abastecimento.query.order_by(Abastecimento.data.desc()).all()
     return render_template('abastecimentos.html', abastecimentos=lista_abastecimentos)
 
@@ -159,18 +188,15 @@ def adicionar_abastecimento():
         )
         db.session.add(novo_abastecimento)
         db.session.commit()
-        # Redireciona para a nova lista de abastecimentos
         return redirect(url_for('abastecimentos'))
 
     veiculos_disp = Veiculo.query.all()
     funcionarios_disp = Funcionario.query.all()
     return render_template('adicionar_abastecimento.html', veiculos=veiculos_disp, funcionarios=funcionarios_disp)
-# --- NOVAS ROTAS DE EDITAR E EXCLUIR ABASTECIMENTO ---
 
 @app.route('/abastecimento/editar/<int:id>', methods=['GET', 'POST'])
 def editar_abastecimento(id):
     abast = Abastecimento.query.get_or_404(id)
-
     if request.method == 'POST':
         abast.id_veiculo = int(request.form['id_veiculo'])
         abast.id_funcionario = int(request.form['id_funcionario'])
@@ -181,7 +207,6 @@ def editar_abastecimento(id):
         db.session.commit()
         return redirect(url_for('abastecimentos'))
 
-    # Para o método GET, precisamos buscar os dados para os dropdowns
     veiculos_disp = Veiculo.query.all()
     funcionarios_disp = Funcionario.query.all()
     return render_template('editar_abastecimento.html', abastecimento=abast, veiculos=veiculos_disp, funcionarios=funcionarios_disp)
@@ -192,3 +217,132 @@ def excluir_abastecimento(id):
     db.session.delete(abast_para_excluir)
     db.session.commit()
     return redirect(url_for('abastecimentos'))
+
+# --- ROTAS DE MANUTENÇÕES ---
+@app.route('/manutencoes')
+def manutencoes():
+    lista_manutencoes = Manutencao.query.order_by(Manutencao.data.desc()).all()
+    return render_template('manutencoes.html', manutencoes=lista_manutencoes)
+
+@app.route('/manutencao/novo', methods=['GET', 'POST'])
+def adicionar_manutencao():
+    if request.method == 'POST':
+        nova_manutencao = Manutencao(
+            id_veiculo=int(request.form['id_veiculo']),
+            data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+            descricao_servico=request.form['descricao_servico'],
+            custo=float(request.form['custo']),
+            km_odometro=int(request.form['km_odometro'])
+        )
+        db.session.add(nova_manutencao)
+        db.session.commit()
+        return redirect(url_for('manutencoes'))
+    
+    veiculos_disp = Veiculo.query.all()
+    return render_template('adicionar_manutencao.html', veiculos=veiculos_disp)
+
+@app.route('/manutencao/editar/<int:id>', methods=['GET', 'POST'])
+def editar_manutencao(id):
+    manutencao = Manutencao.query.get_or_404(id)
+    if request.method == 'POST':
+        manutencao.id_veiculo = int(request.form['id_veiculo'])
+        manutencao.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+        manutencao.descricao_servico = request.form['descricao_servico']
+        manutencao.custo = float(request.form['custo'])
+        manutencao.km_odometro = int(request.form['km_odometro'])
+        db.session.commit()
+        return redirect(url_for('manutencoes'))
+
+    veiculos_disp = Veiculo.query.all()
+    return render_template('editar_manutencao.html', manutencao=manutencao, veiculos=veiculos_disp)
+
+@app.route('/manutencao/excluir/<int:id>', methods=['POST'])
+def excluir_manutencao(id):
+    manutencao = Manutencao.query.get_or_404(id)
+    db.session.delete(manutencao)
+    db.session.commit()
+    return redirect(url_for('manutencoes'))
+
+# --- ROTAS DE DESPESAS GERAIS ---
+@app.route('/despesas')
+def despesas():
+    lista_despesas = DespesaGeral.query.order_by(DespesaGeral.data.desc()).all()
+    return render_template('despesas.html', despesas=lista_despesas)
+
+@app.route('/despesa/novo', methods=['GET', 'POST'])
+def adicionar_despesa():
+    if request.method == 'POST':
+        nova_despesa = DespesaGeral(
+            data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+            categoria=request.form['categoria'],
+            descricao=request.form['descricao'],
+            valor=float(request.form['valor'])
+        )
+        db.session.add(nova_despesa)
+        db.session.commit()
+        return redirect(url_for('despesas'))
+    return render_template('adicionar_despesa.html')
+
+@app.route('/despesa/editar/<int:id>', methods=['GET', 'POST'])
+def editar_despesa(id):
+    despesa = DespesaGeral.query.get_or_404(id)
+    if request.method == 'POST':
+        despesa.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+        despesa.categoria = request.form['categoria']
+        despesa.descricao = request.form['descricao']
+        despesa.valor = float(request.form['valor'])
+        db.session.commit()
+        return redirect(url_for('despesas'))
+    return render_template('editar_despesa.html', despesa=despesa)
+
+@app.route('/despesa/excluir/<int:id>', methods=['POST'])
+def excluir_despesa(id):
+    despesa = DespesaGeral.query.get_or_404(id)
+    db.session.delete(despesa)
+    db.session.commit()
+    return redirect(url_for('despesas'))
+
+# --- ROTAS DE RECEITAS ---
+@app.route('/receitas')
+def receitas():
+    lista_receitas = Receita.query.order_by(Receita.data.desc()).all()
+    return render_template('receitas.html', receitas=lista_receitas)
+
+@app.route('/receita/novo', methods=['GET', 'POST'])
+def adicionar_receita():
+    if request.method == 'POST':
+        id_veiculo_form = request.form.get('id_veiculo')
+        nova_receita = Receita(
+            data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+            descricao=request.form['descricao'],
+            valor=float(request.form['valor']),
+            id_veiculo=int(id_veiculo_form) if id_veiculo_form else None
+        )
+        db.session.add(nova_receita)
+        db.session.commit()
+        return redirect(url_for('receitas'))
+    
+    veiculos_disp = Veiculo.query.all()
+    return render_template('adicionar_receita.html', veiculos=veiculos_disp)
+
+@app.route('/receita/editar/<int:id>', methods=['GET', 'POST'])
+def editar_receita(id):
+    receita = Receita.query.get_or_404(id)
+    if request.method == 'POST':
+        id_veiculo_form = request.form.get('id_veiculo')
+        receita.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+        receita.descricao = request.form['descricao']
+        receita.valor = float(request.form['valor'])
+        receita.id_veiculo = int(id_veiculo_form) if id_veiculo_form else None
+        db.session.commit()
+        return redirect(url_for('receitas'))
+
+    veiculos_disp = Veiculo.query.all()
+    return render_template('editar_receita.html', receita=receita, veiculos=veiculos_disp)
+
+@app.route('/receita/excluir/<int:id>', methods=['POST'])
+def excluir_receita(id):
+    receita = Receita.query.get_or_404(id)
+    db.session.delete(receita)
+    db.session.commit()
+    return redirect(url_for('receitas'))
