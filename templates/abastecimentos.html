@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Histórico de Abastecimentos - Scala Gestão{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Histórico de Abastecimentos</h1>
+    <a href="{{ url_for('adicionar_abastecimento') }}" class="btn btn-primary">
+        Registrar Novo Abastecimento
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Data</th>
+                    <th>Veículo</th>
+                    <th>Motorista</th>
+                    <th>KM Odômetro</th>
+                    <th>Litros</th>
+                    <th>Valor Total</th>
+                    <th>Preço/Litro</th>
+                    <th>Ações</th> </tr>
+            </thead>
+            <tbody>
+                {% for abast in abastecimentos %}
+                <tr>
+                    <td>{{ abast.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ abast.veiculo.placa }}</td>
+                    <td>{{ abast.funcionario.nome }}</td>
+                    <td>{{ abast.km_odometro }} km</td>
+                    <td>{{ "%.2f"|format(abast.litros) }} L</td>
+                    <td>R$ {{ "%.2f"|format(abast.valor_total) }}</td>
+                    <td>R$ {{ "%.2f"|format(abast.valor_total / abast.litros) }}</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('editar_abastecimento', id=abast.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                            <form method="POST" action="{{ url_for('excluir_abastecimento', id=abast.id) }}">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('Tem certeza que deseja excluir este registro?')">
+                                    Excluir
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
