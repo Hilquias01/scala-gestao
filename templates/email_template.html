@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .container { padding: 20px; border: 1px solid #ddd; }
+        .header { font-size: 24px; color: #0d2a4e; }
+        .summary { margin-top: 20px; }
+        .money { font-weight: bold; }
+        .positive { color: green; }
+        .negative { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="header">Relatório Mensal - Scala Gestão</h1>
+        <p>Resumo financeiro para o mês de <strong>{{ mes }}/{{ ano }}</strong>.</p>
+        <div class="summary">
+            <p><strong>Total de Receitas:</strong> <span class="money positive">R$ {{ "%.2f"|format(total_receitas) }}</span></p>
+            <p><strong>Total de Despesas:</strong> <span class="money negative">R$ {{ "%.2f"|format(total_despesas) }}</span></p>
+            <hr>
+            <p><strong>Saldo Final do Mês:</strong> 
+                <span class="money {% if saldo_final >= 0 %}positive{% else %}negative{% endif %}">
+                    R$ {{ "%.2f"|format(saldo_final) }}
+                </span>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

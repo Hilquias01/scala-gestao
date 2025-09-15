@@ -1,0 +1,46 @@
+/* Definindo as cores da marca como variáveis para fácil reutilização */
+:root {
+    --cor-primaria: #0d2a4e; /* Azul Escuro do Logo */
+    --cor-destaque: #f5b32a; /* Amarelo/Mostarda do Logo */
+    --cor-fundo: #f8f9fa;   /* Um cinza bem claro para o fundo */
+}
+
+/* Estilo geral do corpo da página */
+body {
+    background-color: var(--cor-fundo);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Uma fonte mais moderna */
+}
+
+/* Customizando os cabeçalhos principais */
+h1 {
+    color: var(--cor-primaria);
+    font-weight: 700; /* Deixa o título mais forte */
+}
+
+/* Customizando o cabeçalho dos cards */
+.card-header {
+    background-color: var(--cor-primaria);
+    color: white;
+    font-weight: 600;
+}
+
+/* Customizando o botão primário (azul padrão do Bootstrap) para a cor da marca */
+.btn-primary {
+    background-color: var(--cor-destaque);
+    border-color: var(--cor-destaque);
+    color: var(--cor-primaria);
+    font-weight: 600;
+}
+
+/* Efeito ao passar o mouse sobre o botão primário */
+.btn-primary:hover {
+    background-color: #e0a326; /* Um tom de amarelo um pouco mais escuro */
+    border-color: #e0a326;
+    color: var(--cor-primaria);
+}
+
+/* Customizando a barra de navegação */
+.navbar-dark .navbar-brand {
+    color: var(--cor-destaque);
+    font-weight: bold;
+}

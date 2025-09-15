@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Frota de Veículos - Scala Gestão{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Frota de Veículos</h1>
+    {% if current_user.role == 'admin' %}
+    <a href="{{ url_for('adicionar_veiculo') }}" class="btn btn-primary">
+        Cadastrar Novo Veículo
+    </a>
+    {% endif %}
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Placa</th>
+                    <th>Modelo</th>
+                    <th>Ano</th>
+                    <th>Km Inicial</th>
+                    {% if current_user.role == 'admin' %}
+                    <th>Ações</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for veiculo in lista_de_veiculos %}
+                <tr>
+                    <td>{{ veiculo.placa }}</td>
+                    <td>{{ veiculo.modelo }}</td>
+                    <td>{{ veiculo.ano }}</td>
+                    <td>{{ veiculo.km_inicial }} km</td>
+                    {% if current_user.role == 'admin' %}
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('editar_veiculo', id=veiculo.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                            <form method="POST" action="{{ url_for('excluir_veiculo', id=veiculo.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este veículo?')">Excluir</button>
+                            </form>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -5,9 +5,11 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Histórico de Abastecimentos</h1>
+    {% if current_user.role == 'admin' %}
     <a href="{{ url_for('adicionar_abastecimento') }}" class="btn btn-primary">
         Registrar Novo Abastecimento
     </a>
+    {% endif %}
 </div>
 
 <div class="card shadow-sm">
@@ -22,7 +24,10 @@
                     <th>Litros</th>
                     <th>Valor Total</th>
                     <th>Preço/Litro</th>
-                    <th>Ações</th> </tr>
+                    {% if current_user.role == 'admin' %}
+                    <th>Ações</th>
+                    {% endif %}
+                </tr>
             </thead>
             <tbody>
                 {% for abast in abastecimentos %}
@@ -34,17 +39,16 @@
                     <td>{{ "%.2f"|format(abast.litros) }} L</td>
                     <td>R$ {{ "%.2f"|format(abast.valor_total) }}</td>
                     <td>R$ {{ "%.2f"|format(abast.valor_total / abast.litros) }}</td>
+                    {% if current_user.role == 'admin' %}
                     <td>
                         <div class="d-flex gap-2">
                             <a href="{{ url_for('editar_abastecimento', id=abast.id) }}" class="btn btn-sm btn-warning">Editar</a>
                             <form method="POST" action="{{ url_for('excluir_abastecimento', id=abast.id) }}">
-                                <button type="submit" class="btn btn-sm btn-danger"
-                                    onclick="return confirm('Tem certeza que deseja excluir este registro?')">
-                                    Excluir
-                                </button>
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este registro?')">Excluir</button>
                             </form>
                         </div>
                     </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
