@@ -1,12 +1,13 @@
 import os
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, extract
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
+from weasyprint import HTML
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -134,55 +135,83 @@ def logout():
     flash('Você foi desconectado com sucesso.', 'success')
     return redirect(url_for('login'))
 
-# --- ROTAS PRINCIPAIS E RELATÓRIO ---
+# --- ROTAS PRINCIPAIS E RELATÓRIOS ---
 @app.route('/')
 @login_required
 def home():
-    # Lógica do Dashboard...
-    ano_atual = datetime.now().year
-    mes_atual = datetime.now().month
+    ano_selecionado = request.args.get('ano', default=datetime.now().year, type=int)
+    mes_selecionado = request.args.get('mes', default=datetime.now().month, type=int)
+    total_veiculos = Veiculo.query.count()
+    total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
     gastos_por_categoria = {}
-    total_combustivel = db.session.query(func.sum(Abastecimento.valor_total)).filter(extract('year', Abastecimento.data) == ano_atual, extract('month', Abastecimento.data) == mes_atual).scalar() or 0.0
+    total_combustivel = db.session.query(func.sum(Abastecimento.valor_total)).filter(extract('year', Abastecimento.data) == ano_selecionado, extract('month', Abastecimento.data) == mes_selecionado).scalar() or 0.0
     if total_combustivel > 0: gastos_por_categoria['Combustível'] = round(total_combustivel, 2)
-    total_manutencao = db.session.query(func.sum(Manutencao.custo)).filter(extract('year', Manutencao.data) == ano_atual, extract('month', Manutencao.data) == mes_atual).scalar() or 0.0
+    total_manutencao = db.session.query(func.sum(Manutencao.custo)).filter(extract('year', Manutencao.data) == ano_selecionado, extract('month', Manutencao.data) == mes_selecionado).scalar() or 0.0
     if total_manutencao > 0: gastos_por_categoria['Manutenção'] = round(total_manutencao, 2)
-    despesas_agrupadas = db.session.query(DespesaGeral.categoria, func.sum(DespesaGeral.valor)).filter(extract('year', DespesaGeral.data) == ano_atual, extract('month', DespesaGeral.data) == mes_atual).group_by(DespesaGeral.categoria).all()
+    despesas_agrupadas = db.session.query(DespesaGeral.categoria, func.sum(DespesaGeral.valor)).filter(extract('year', DespesaGeral.data) == ano_selecionado, extract('month', DespesaGeral.data) == mes_selecionado).group_by(DespesaGeral.categoria).all()
     for categoria, total in despesas_agrupadas:
         if total and total > 0: gastos_por_categoria[categoria] = round(gastos_por_categoria.get(categoria, 0) + total, 2)
     total_gastos_mes = sum(gastos_por_categoria.values())
-    total_receitas_mes = db.session.query(func.sum(Receita.valor)).filter(extract('year', Receita.data) == ano_atual, extract('month', Receita.data) == mes_atual).scalar() or 0.0
+    total_receitas_mes = db.session.query(func.sum(Receita.valor)).filter(extract('year', Receita.data) == ano_selecionado, extract('month', Receita.data) == mes_selecionado).scalar() or 0.0
     saldo_mes = round(total_receitas_mes - total_gastos_mes, 2)
     chart_labels = list(gastos_por_categoria.keys())
     chart_data = list(gastos_por_categoria.values())
-    return render_template('index.html', total_veiculos=Veiculo.query.count(), total_funcionarios=Funcionario.query.filter_by(ativo=True).count(), total_gastos_mes=round(total_gastos_mes, 2), total_receitas_mes=round(total_receitas_mes, 2), saldo_mes=saldo_mes, chart_labels=chart_labels, chart_data=chart_data)
+    anos_disponiveis = range(datetime.now().year, 2019, -1)
+    return render_template('index.html', total_veiculos=total_veiculos, total_funcionarios=total_funcionarios, total_gastos_mes=round(total_gastos_mes, 2), total_receitas_mes=round(total_receitas_mes, 2), saldo_mes=saldo_mes, chart_labels=chart_labels, chart_data=chart_data, anos_disponiveis=anos_disponiveis, ano_selecionado=ano_selecionado, mes_selecionado=mes_selecionado)
 
-@app.route('/relatorio/enviar')
+def calcular_dados_relatorio(ano, mes):
+    total_receitas = db.session.query(func.sum(Receita.valor)).filter(extract('year', Receita.data) == ano, extract('month', Receita.data) == mes).scalar() or 0.0
+    total_combustivel = db.session.query(func.sum(Abastecimento.valor_total)).filter(extract('year', Abastecimento.data) == ano, extract('month', Abastecimento.data) == mes).scalar() or 0.0
+    total_manutencao = db.session.query(func.sum(Manutencao.custo)).filter(extract('year', Manutencao.data) == ano, extract('month', Manutencao.data) == mes).scalar() or 0.0
+    total_despesas_gerais = db.session.query(func.sum(DespesaGeral.valor)).filter(extract('year', DespesaGeral.data) == ano, extract('month', DespesaGeral.data) == mes).scalar() or 0.0
+    total_despesas = total_combustivel + total_manutencao + total_despesas_gerais
+    saldo_final = total_receitas - total_despesas
+    return {"mes": mes, "ano": ano, "total_receitas": total_receitas, "total_despesas": total_despesas, "saldo_final": saldo_final, "total_combustivel": total_combustivel, "total_manutencao": total_manutencao, "total_despesas_gerais": total_despesas_gerais}
+
+@app.route('/relatorios', methods=['GET', 'POST'])
 @login_required
 @admin_required
-def enviar_relatorio():
+def relatorios():
+    if request.method == 'POST':
+        mes = request.form.get('mes')
+        ano = request.form.get('ano')
+        return redirect(url_for('visualizar_relatorio', ano=ano, mes=mes))
+    anos_disponiveis = range(datetime.now().year, 2019, -1)
+    return render_template('relatorios.html', anos_disponiveis=anos_disponiveis)
+
+@app.route('/relatorio/visualizar/<int:ano>/<int:mes>')
+@login_required
+@admin_required
+def visualizar_relatorio(ano, mes):
+    dados = calcular_dados_relatorio(ano, mes)
+    return render_template('relatorio_visualizar.html', dados=dados)
+
+@app.route('/relatorio/pdf/<int:ano>/<int:mes>')
+@login_required
+@admin_required
+def gerar_relatorio_pdf(ano, mes):
+    dados = calcular_dados_relatorio(ano, mes)
+    html = render_template('relatorio_template.html', dados=dados)
+    pdf = HTML(string=html).write_pdf()
+    return Response(pdf, mimetype='application/pdf', headers={'Content-Disposition': f'attachment;filename=relatorio_{mes}_{ano}.pdf'})
+
+@app.route('/relatorio/enviar', methods=['POST'])
+@login_required
+@admin_required
+def enviar_relatorio_email():
     try:
-        hoje = datetime.today()
-        primeiro_dia_mes_atual = hoje.replace(day=1)
-        ultimo_dia_mes_passado = primeiro_dia_mes_atual - timedelta(days=1)
-        ano_relatorio, mes_relatorio = ultimo_dia_mes_passado.year, ultimo_dia_mes_passado.month
-
-        total_receitas = db.session.query(func.sum(Receita.valor)).filter(extract('year', Receita.data) == ano_relatorio, extract('month', Receita.data) == mes_relatorio).scalar() or 0.0
-        total_combustivel = db.session.query(func.sum(Abastecimento.valor_total)).filter(extract('year', Abastecimento.data) == ano_relatorio, extract('month', Abastecimento.data) == mes_relatorio).scalar() or 0.0
-        total_manutencao = db.session.query(func.sum(Manutencao.custo)).filter(extract('year', Manutencao.data) == ano_relatorio, extract('month', Manutencao.data) == mes_relatorio).scalar() or 0.0
-        total_despesas_gerais = db.session.query(func.sum(DespesaGeral.valor)).filter(extract('year', DespesaGeral.data) == ano_relatorio, extract('month', DespesaGeral.data) == mes_relatorio).scalar() or 0.0
-        
-        total_despesas = total_combustivel + total_manutencao + total_despesas_gerais
-        saldo_final = total_receitas - total_despesas
-
-        corpo_email = render_template('email_template.html', mes=mes_relatorio, ano=ano_relatorio, total_receitas=total_receitas, total_despesas=total_despesas, saldo_final=saldo_final)
-        msg = Message(subject=f"Relatório Mensal Scala Gestão - {mes_relatorio}/{ano_relatorio}", sender=app.config['MAIL_USERNAME'], recipients=[app.config['MAIL_USERNAME']])
+        email_destinatario = request.form.get('email')
+        ano = request.form.get('ano')
+        mes = request.form.get('mes')
+        dados = calcular_dados_relatorio(int(ano), int(mes))
+        corpo_email = render_template('relatorio_template.html', dados=dados)
+        msg = Message(subject=f"Relatório Mensal Scala Gestão - {mes}/{ano}", sender=app.config['MAIL_USERNAME'], recipients=[email_destinatario])
         msg.html = corpo_email
         mail.send(msg)
-        flash('Relatório por e-mail enviado com sucesso!', 'success')
+        flash(f'Relatório enviado com sucesso para {email_destinatario}!', 'success')
     except Exception as e:
         flash(f'Ocorreu um erro ao enviar o e-mail: {e}', 'danger')
-    return redirect(url_for('home'))
-
+    return redirect(url_for('relatorios'))
 
 # --- ROTAS DA FROTA ---
 @app.route('/frota')

@@ -1,14 +1,37 @@
-// Espera o documento carregar completamente
-document.addEventListener('DOMContentLoaded', function() {
-    // Procura pelo campo de input com o id 'placa-input'
+document.addEventListener('DOMContentLoaded', function () {
     const placaInput = document.getElementById('placa-input');
-
-    // Se o campo existir na página...
     if (placaInput) {
-        // Adiciona um "ouvinte" que dispara toda vez que o usuário digita algo
-        placaInput.addEventListener('input', function(event) {
-            // Pega o valor atual do campo, converte para maiúsculas e o define de volta no campo
-            event.target.value = event.target.value.toUpperCase();
+        const placaMask = IMask(placaInput, {
+            mask: [
+                {
+                    mask: 'AAA-0000',
+                    definitions: { 'A': /[A-Z]/ } // Define 'A' como qualquer letra maiúscula
+                },
+                {
+                    mask: 'AAA-0A00',
+                    definitions: { 'A': /[A-Z]/ } // Define 'A' como qualquer letra maiúscula
+                }
+            ],
+            prepare: function (str) {
+                return str.toUpperCase(); // Sempre converte para maiúsculo
+            },
         });
     }
+
+    const moneyInputs = document.querySelectorAll('.money-mask');
+    moneyInputs.forEach(function(input) {
+        const moneyMask = IMask(input, {
+            mask: 'R$ num',
+            blocks: {
+                num: {
+                    mask: Number,
+                    scale: 2,
+                    thousandsSeparator: '.',
+                    padFractionalZeros: true,
+                    radix: ',',
+                    mapToRadix: ['.']
+                }
+            }
+        });
+    });
 });
