@@ -3,35 +3,30 @@
 {% block title %}Gerar Relatório - Scala Gestão{% endblock %}
 
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-header">
-        <h2>Gerar Relatório Mensal</h2>
-    </div>
-    <div class="card-body">
-        <form method="POST" action="{{ url_for('relatorios') }}">
-            <p>Selecione o período para gerar o relatório de receitas e despesas.</p>
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label for="mes" class="form-label">Mês</label>
-                    <select name="mes" id="mes" class="form-select">
-                        {% for i in range(1, 13) %}
-                            <option value="{{ i }}">{{ ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][i-1] }}</option>
-                        {% endfor %}
-                    </select>
+<div class="container mt-5 mb-5">
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <h2>Gerar Relatório Detalhado</h2>
+        </div>
+        <div class="card-body">
+            <p class="card-text">Selecione o período desejado para gerar o relatório em formato PDF. O relatório incluirá um resumo financeiro, análise de despesas, receitas e um detalhamento completo por veículo.</p>
+            
+            <form method="POST">
+                <div class="row align-items-end">
+                    <div class="col-md-5 mb-3">
+                        <label for="data_inicio" class="form-label">Data de Início</label>
+                        <input type="date" class="form-control" id="data_inicio" name="data_inicio" required>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <label for="data_fim" class="form-label">Data de Fim</label>
+                        <input type="date" class="form-control" id="data_fim" name="data_fim" required>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <button type="submit" class="btn btn-primary w-100">Gerar PDF</button>
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label for="ano" class="form-label">Ano</label>
-                    <select name="ano" id="ano" class="form-select">
-                        {% for ano in anos_disponiveis %}
-                            <option value="{{ ano }}">{{ ano }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100">Visualizar Relatório</button>
-                </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

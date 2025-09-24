@@ -5,13 +5,13 @@
 {% block content %}
 <div class="container mt-5">
     <div class="card shadow-sm">
-        <div class="card-header bg-dark text-white">
+        <div class="card-header" style="background-color: #0d2a4e; color: white;">
             <h2>Cadastrar Novo Veículo</h2>
         </div>
         <div class="card-body">
             <form method="POST">
                 <div class="mb-3">
-                    <label for="placa" class="form-label">Placa</label>
+                    <label for="placa-input" class="form-label">Placa</label>
                     <input type="text" class="form-control" id="placa-input" name="placa" required>
                 </div>
                 <div class="mb-3">
@@ -20,14 +20,16 @@
                 </div>
                 <div class="mb-3">
                     <label for="ano" class="form-label">Ano</label>
-                    <input type="number" class="form-control" id="ano" name="ano" required>
+                    <input type="number" class="form-control" id="ano" name="ano" required min="1950" max="2099">
                 </div>
                 <div class="mb-3">
                     <label for="km_inicial" class="form-label">Quilometragem Inicial</label>
                     <input type="number" class="form-control" id="km_inicial" name="km_inicial" required>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Cadastrar Veículo</button>
-                <a href="{{ url_for('home') }}" class="btn btn-secondary w-100 mt-2">Cancelar</a>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Cadastrar Veículo</button>
+                    <a href="{{ url_for('frota') }}" class="btn btn-secondary">Cancelar</a>
+                </div>
             </form>
         </div>
     </div>

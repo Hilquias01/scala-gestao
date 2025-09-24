@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-g">
+    <title>Relatório de Gestão - {{ data_inicio }} a {{ data_fim }}</title>
+    <style>
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; }
+        .container { width: 90%; margin: auto; }
+        h1 { color: #0d2a4e; text-align: center; border-bottom: 2px solid #f5b32a; padding-bottom: 10px; }
+        h2 { color: #0d2a4e; border-bottom: 1px solid #ddd; margin-top: 40px; }
+        .header-info { text-align: center; margin-bottom: 40px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .summary-cards { display: flex; justify-content: space-around; text-align: center; margin: 20px 0; }
+        .card { border: 1px solid #ddd; padding: 15px; width: 22%; }
+        .card-title { font-size: 14px; font-weight: bold; color: #555; }
+        .card-value { font-size: 20px; font-weight: bold; }
+        .grafico { text-align: center; margin: 40px 0; }
+        .veiculo-section { page-break-before: always; } /* Começa cada veículo em uma nova página */
+        .total-row { font-weight: bold; background-color: #f8f8f8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Relatório de Gestão de Frota</h1>
+        <div class="header-info">
+            Período de Análise: <strong>{{ data_inicio }}</strong> a <strong>{{ data_fim }}</strong><br>
+            Data de Emissão: <strong>{{ data_emissao }}</strong>
+        </div>
+
+        <h2>Resumo Financeiro Geral</h2>
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-title">TOTAL DE RECEITAS</div>
+                <div class="card-value">R$ {{ "%.2f"|format(resumo.total_receitas) }}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">TOTAL DE DESPESAS</div>
+                <div class="card-value">R$ {{ "%.2f"|format(resumo.total_despesas) }}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">SALDO FINAL</div>
+                <div class="card-value">R$ {{ "%.2f"|format(resumo.saldo) }}</div>
+            </div>
+        </div>
+
+        <div class="grafico">
+            <h2>Gastos por Categoria</h2>
+            <img src="data:image/png;base64,{{ grafico_gastos_categoria }}" style="max-width: 80%;">
+        </div>
+        
+        <div class="grafico">
+            <h2>Receitas vs. Despesas</h2>
+             <img src="data:image/png;base64,{{ grafico_receita_despesa }}" style="max-width: 80%;">
+        </div>
+
+        <h2 style="page-break-before: always;">Detalhamento de Despesas</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Descrição</th>
+                    <th>Veículo</th>
+                    <th>Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for despesa in detalhamento.despesas %}
+                <tr>
+                    <td>{{ despesa.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ despesa.tipo }}</td>
+                    <td>{{ despesa.descricao }}</td>
+                    <td>{{ despesa.veiculo_placa or 'N/A' }}</td>
+                    <td>{{ "%.2f"|format(despesa.valor) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td colspan="4">TOTAL DE DESPESAS</td>
+                    <td>R$ {{ "%.2f"|format(resumo.total_despesas) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Detalhamento de Receitas</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Descrição</th>
+                    <th>Veículo</th>
+                    <th>Valor (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for receita in detalhamento.receitas %}
+                <tr>
+                    <td>{{ receita.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ receita.descricao }}</td>
+                    <td>{{ receita.veiculo.placa if receita.veiculo else 'N/A' }}</td>
+                    <td>{{ "%.2f"|format(receita.valor) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td colspan="3">TOTAL DE RECEITAS</td>
+                    <td>R$ {{ "%.2f"|format(resumo.total_receitas) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% for veiculo in detalhamento_veiculos %}
+        <div class="veiculo-section">
+            <h2>Análise Individual - Veículo: {{ veiculo.placa }} ({{ veiculo.modelo }})</h2>
+            <div class="summary-cards">
+                <div class="card">
+                    <div class="card-title">DESPESA COMBUSTÍVEL</div>
+                    <div class="card-value">R$ {{ "%.2f"|format(veiculo.total_combustivel) }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">DESPESA MANUTENÇÃO</div>
+                    <div class="card-value">R$ {{ "%.2f"|format(veiculo.total_manutencao) }}</div>
+                </div>
+                 <div class="card">
+                    <div class="card-title">RECEITA GERADA</div>
+                    <div class="card-value">R$ {{ "%.2f"|format(veiculo.total_receita) }}</div>
+                </div>
+            </div>
+
+            <h3>Abastecimentos</h3>
+            {% if veiculo.abastecimentos %}
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>KM</th><th>Litros</th><th>Valor (R$)</th></tr>
+                </thead>
+                <tbody>
+                    {% for abast in veiculo.abastecimentos %}
+                    <tr>
+                        <td>{{ abast.data.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ abast.km_odometro }}</td>
+                        <td>{{ "%.2f"|format(abast.litros) }}</td>
+                        <td>{{ "%.2f"|format(abast.valor_total) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Nenhum abastecimento registrado neste período.</p>
+            {% endif %}
+
+            <h3>Manutenções</h3>
+            {% if veiculo.manutencoes %}
+            <table>
+                 <thead>
+                    <tr><th>Data</th><th>Serviço</th><th>Custo (R$)</th></tr>
+                </thead>
+                <tbody>
+                    {% for manut in veiculo.manutencoes %}
+                    <tr>
+                        <td>{{ manut.data.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ manut.descricao_servico }}</td>
+                        <td>{{ "%.2f"|format(manut.custo) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Nenhuma manutenção registrada neste período.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>
