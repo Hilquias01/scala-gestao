@@ -2,13 +2,14 @@
 <html>
 <head>
     <style>
-        body { font-family: Arial, sans-serif; }
-        .container { padding: 20px; border: 1px solid #ddd; }
-        .header { font-size: 24px; color: #0d2a4e; }
-        .summary { margin-top: 20px; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; background-color: #ffffff; }
+        .header { font-size: 24px; color: #0d2a4e; text-align: center; padding-bottom: 10px; border-bottom: 2px solid #f5b32a;}
+        .summary { margin-top: 20px; font-size: 16px; }
         .money { font-weight: bold; }
-        .positive { color: green; }
-        .negative { color: red; }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .footer { margin-top: 30px; font-size: 12px; color: #777; text-align: center; }
     </style>
 </head>
 <body>
@@ -24,6 +25,9 @@
                     R$ {{ "%.2f"|format(saldo_final) }}
                 </span>
             </p>
+        </div>
+        <div class="footer">
+            <p>Este é um e-mail gerado automaticamente pelo sistema Scala Gestão.</p>
         </div>
     </div>
 </body>

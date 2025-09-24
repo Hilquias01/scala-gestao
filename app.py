@@ -1,12 +1,23 @@
+# app.py
 import os
+import io
+import base64
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from sqlalchemy import func, extract
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_mail import Mail, Message
+
+# Bibliotecas para o PDF e Gráficos
+from weasyprint import HTML
+import matplotlib
+matplotlib.use('Agg') # Usa um backend não-interativo para o Matplotlib
+import matplotlib.pyplot as plt
+
+# Importações locais
+from database import db
+from models import Usuario, Veiculo, Funcionario, Abastecimento, Manutencao, DespesaGeral, Receita
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -20,10 +31,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAIL_SERVER'] = 'smtp.googlemail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME') # Pega da variável de ambiente
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD') # Pega da variável de ambiente
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 
-db = SQLAlchemy(app)
+# Inicializa as extensões com o app
+db.init_app(app)
 mail = Mail(app)
 
 login_manager = LoginManager()
@@ -31,6 +43,45 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Por favor, faça o login para acessar esta página."
 login_manager.login_message_category = "info"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(Usuario, int(user_id))
+
+# --- FUNÇÕES AUXILIARES PARA GRÁFICOS ---
+def gerar_grafico_pizza(labels, data, titulo):
+    if not data: return None
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.pie(data, labels=labels, autopct='%1.1f%%', startangle=90, colors=plt.cm.Paired.colors)
+    ax.axis('equal')
+    ax.set_title(titulo)
+    
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png')
+    plt.close(fig)
+    buf.seek(0)
+    
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    return img_base64
+
+def gerar_grafico_barras(labels, data, titulo):
+    if not data or all(v == 0 for v in data): return None
+    fig, ax = plt.subplots(figsize=(8, 5))
+    colors = ['#28a745', '#dc3545'] # Verde para receita, vermelho para despesa
+    ax.bar(labels, data, color=colors)
+    ax.set_ylabel('Valor (R$)')
+    ax.set_title(titulo)
+
+    for i, v in enumerate(data):
+        ax.text(i, v, f'R$ {v:.2f}', ha='center', va='bottom')
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png')
+    plt.close(fig)
+    buf.seek(0)
+
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    return img_base64
 
 # --- DECORADOR DE ADMIN ---
 def admin_required(f):
@@ -41,77 +92,6 @@ def admin_required(f):
             return redirect(url_for('home'))
         return f(*args, **kwargs)
     return decorated_function
-
-# --- MODELOS ---
-class Usuario(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256))
-    role = db.Column(db.String(80), nullable=False)
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-@login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(Usuario, int(user_id))
-
-class Veiculo(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    placa = db.Column(db.String(10), unique=True, nullable=False)
-    modelo = db.Column(db.String(100), nullable=False)
-    ano = db.Column(db.Integer, nullable=False)
-    km_inicial = db.Column(db.Integer, nullable=False)
-    abastecimentos = db.relationship('Abastecimento', backref='veiculo', lazy=True, cascade="all, delete-orphan")
-    manutencoes = db.relationship('Manutencao', backref='veiculo', lazy=True, cascade="all, delete-orphan")
-    receitas = db.relationship('Receita', backref='veiculo', lazy=True, cascade="all, delete-orphan")
-
-class Funcionario(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(150), nullable=False)
-    funcao = db.Column(db.String(50), nullable=False)
-    data_admissao = db.Column(db.Date, nullable=False)
-    data_nascimento = db.Column(db.Date, nullable=True)
-    cnh_numero = db.Column(db.String(20), nullable=True)
-    cnh_categoria = db.Column(db.String(5), nullable=True)
-    salario_base = db.Column(db.Float, nullable=False)
-    ajuda_custo_extra = db.Column(db.Float, nullable=True, default=0.0)
-    ativo = db.Column(db.Boolean, default=True, nullable=False)
-    abastecimentos = db.relationship('Abastecimento', backref='funcionario', lazy=True)
-
-class Abastecimento(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.Date, nullable=False)
-    litros = db.Column(db.Float, nullable=False)
-    valor_total = db.Column(db.Float, nullable=False)
-    km_odometro = db.Column(db.Integer, nullable=False)
-    id_veiculo = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
-    id_funcionario = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-
-class Manutencao(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.Date, nullable=False)
-    id_veiculo = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
-    descricao_servico = db.Column(db.Text, nullable=False)
-    custo = db.Column(db.Float, nullable=False)
-    km_odometro = db.Column(db.Integer, nullable=False)
-
-class DespesaGeral(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.Date, nullable=False)
-    descricao = db.Column(db.String(200), nullable=False)
-    categoria = db.Column(db.String(50), nullable=False)
-    valor = db.Column(db.Float, nullable=False)
-
-class Receita(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.Date, nullable=False)
-    descricao = db.Column(db.String(200), nullable=False)
-    valor = db.Column(db.Float, nullable=False)
-    id_veiculo = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=True)
 
 # --- ROTAS DE AUTENTICAÇÃO ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -134,11 +114,10 @@ def logout():
     flash('Você foi desconectado com sucesso.', 'success')
     return redirect(url_for('login'))
 
-# --- ROTAS PRINCIPAIS E RELATÓRIO ---
+# --- ROTAS PRINCIPAIS ---
 @app.route('/')
 @login_required
 def home():
-    # Lógica do Dashboard...
     ano_atual = datetime.now().year
     mes_atual = datetime.now().month
     gastos_por_categoria = {}
@@ -156,10 +135,100 @@ def home():
     chart_data = list(gastos_por_categoria.values())
     return render_template('index.html', total_veiculos=Veiculo.query.count(), total_funcionarios=Funcionario.query.filter_by(ativo=True).count(), total_gastos_mes=round(total_gastos_mes, 2), total_receitas_mes=round(total_receitas_mes, 2), saldo_mes=saldo_mes, chart_labels=chart_labels, chart_data=chart_data)
 
+# --- ROTAS DE RELATÓRIOS (NOVO SISTEMA) ---
+@app.route('/relatorios', methods=['GET', 'POST'])
+@login_required
+def relatorios():
+    if request.method == 'POST':
+        try:
+            data_inicio_str = request.form['data_inicio']
+            data_fim_str = request.form['data_fim']
+            
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+
+            # --- COLETA DE DADOS ---
+            # 1. Resumo Geral
+            total_receitas = db.session.query(func.sum(Receita.valor)).filter(Receita.data.between(data_inicio, data_fim)).scalar() or 0.0
+            total_combustivel = db.session.query(func.sum(Abastecimento.valor_total)).filter(Abastecimento.data.between(data_inicio, data_fim)).scalar() or 0.0
+            total_manutencao = db.session.query(func.sum(Manutencao.custo)).filter(Manutencao.data.between(data_inicio, data_fim)).scalar() or 0.0
+            total_despesas_gerais = db.session.query(func.sum(DespesaGeral.valor)).filter(DespesaGeral.data.between(data_inicio, data_fim)).scalar() or 0.0
+            total_despesas = total_combustivel + total_manutencao + total_despesas_gerais
+            
+            resumo_financeiro = {
+                "total_receitas": total_receitas,
+                "total_despesas": total_despesas,
+                "saldo": total_receitas - total_despesas
+            }
+
+            # 2. Dados para Gráficos
+            gastos_por_categoria = {}
+            if total_combustivel > 0: gastos_por_categoria['Combustível'] = total_combustivel
+            if total_manutencao > 0: gastos_por_categoria['Manutenção'] = total_manutencao
+            despesas_gerais_agrupadas = db.session.query(DespesaGeral.categoria, func.sum(DespesaGeral.valor)).filter(DespesaGeral.data.between(data_inicio, data_fim)).group_by(DespesaGeral.categoria).all()
+            for categoria, total in despesas_gerais_agrupadas:
+                if total and total > 0: gastos_por_categoria[categoria] = gastos_por_categoria.get(categoria, 0) + total
+            
+            # 3. Detalhamento de Despesas e Receitas
+            despesas_combustivel_detalhe = Abastecimento.query.filter(Abastecimento.data.between(data_inicio, data_fim)).all()
+            despesas_manutencao_detalhe = Manutencao.query.filter(Manutencao.data.between(data_inicio, data_fim)).all()
+            despesas_gerais_detalhe = DespesaGeral.query.filter(DespesaGeral.data.between(data_inicio, data_fim)).all()
+            
+            lista_despesas_unificada = []
+            for item in despesas_combustivel_detalhe:
+                lista_despesas_unificada.append({'data': item.data, 'tipo': 'Combustível', 'descricao': f"{item.litros:.2f}L", 'veiculo_placa': item.veiculo.placa, 'valor': item.valor_total})
+            for item in despesas_manutencao_detalhe:
+                 lista_despesas_unificada.append({'data': item.data, 'tipo': 'Manutenção', 'descricao': item.descricao_servico, 'veiculo_placa': item.veiculo.placa, 'valor': item.custo})
+            for item in despesas_gerais_detalhe:
+                 lista_despesas_unificada.append({'data': item.data, 'tipo': item.categoria, 'descricao': item.descricao, 'veiculo_placa': None, 'valor': item.valor})
+            lista_despesas_unificada.sort(key=lambda x: x['data'])
+            receitas_detalhe = Receita.query.filter(Receita.data.between(data_inicio, data_fim)).order_by(Receita.data).all()
+            detalhamento_geral = { "despesas": lista_despesas_unificada, "receitas": receitas_detalhe }
+
+            # 4. Detalhamento por Veículo
+            todos_veiculos = Veiculo.query.all()
+            detalhamento_por_veiculo = []
+            for veiculo in todos_veiculos:
+                v_abastecimentos = Abastecimento.query.filter(Abastecimento.id_veiculo == veiculo.id, Abastecimento.data.between(data_inicio, data_fim)).all()
+                v_manutencoes = Manutencao.query.filter(Manutencao.id_veiculo == veiculo.id, Manutencao.data.between(data_inicio, data_fim)).all()
+                v_receitas = Receita.query.filter(Receita.id_veiculo == veiculo.id, Receita.data.between(data_inicio, data_fim)).all()
+
+                if v_abastecimentos or v_manutencoes or v_receitas:
+                    detalhamento_por_veiculo.append({
+                        "placa": veiculo.placa, "modelo": veiculo.modelo,
+                        "total_combustivel": sum(a.valor_total for a in v_abastecimentos),
+                        "total_manutencao": sum(m.custo for m in v_manutencoes),
+                        "total_receita": sum(r.valor for r in v_receitas),
+                        "abastecimentos": v_abastecimentos, "manutencoes": v_manutencoes
+                    })
+
+            # --- GERAÇÃO DOS GRÁFICOS ---
+            grafico_gastos = gerar_grafico_pizza(labels=list(gastos_por_categoria.keys()), data=list(gastos_por_categoria.values()), titulo='Distribuição de Gastos por Categoria')
+            grafico_receita_despesa = gerar_grafico_barras(labels=['Receitas', 'Despesas'], data=[resumo_financeiro['total_receitas'], resumo_financeiro['total_despesas']], titulo='Comparativo: Receitas vs. Despesas')
+
+            # --- RENDERIZAÇÃO DO HTML PARA O PDF ---
+            html_renderizado = render_template('relatorio_pdf.html',
+                data_inicio=data_inicio.strftime('%d/%m/%Y'), data_fim=data_fim.strftime('%d/%m/%Y'),
+                data_emissao=datetime.now().strftime('%d/%m/%Y'), resumo=resumo_financeiro,
+                detalhamento=detalhamento_geral, detalhamento_veiculos=detalhamento_por_veiculo,
+                grafico_gastos_categoria=grafico_gastos, grafico_receita_despesa=grafico_receita_despesa)
+            
+            pdf = HTML(string=html_renderizado).write_pdf()
+            return Response(pdf, mimetype='application/pdf', headers={'Content-Disposition': 'attachment;filename=relatorio_scala_gestao.pdf'})
+
+        except Exception as e:
+            print(f"--- ERRO AO GERAR RELATÓRIO: {e} ---")
+            flash("Ocorreu um erro ao gerar o relatório. Verifique as datas e tente novamente.", "danger")
+            return redirect(url_for('relatorios'))
+
+    return render_template('relatorios.html')
+
+
 @app.route('/relatorio/enviar')
 @login_required
 @admin_required
 def enviar_relatorio():
+    # Esta rota agora é secundária, mas a mantemos caso queira usá-la.
     try:
         hoje = datetime.today()
         primeiro_dia_mes_atual = hoje.replace(day=1)
@@ -170,7 +239,6 @@ def enviar_relatorio():
         total_combustivel = db.session.query(func.sum(Abastecimento.valor_total)).filter(extract('year', Abastecimento.data) == ano_relatorio, extract('month', Abastecimento.data) == mes_relatorio).scalar() or 0.0
         total_manutencao = db.session.query(func.sum(Manutencao.custo)).filter(extract('year', Manutencao.data) == ano_relatorio, extract('month', Manutencao.data) == mes_relatorio).scalar() or 0.0
         total_despesas_gerais = db.session.query(func.sum(DespesaGeral.valor)).filter(extract('year', DespesaGeral.data) == ano_relatorio, extract('month', DespesaGeral.data) == mes_relatorio).scalar() or 0.0
-        
         total_despesas = total_combustivel + total_manutencao + total_despesas_gerais
         saldo_final = total_receitas - total_despesas
 
@@ -180,11 +248,14 @@ def enviar_relatorio():
         mail.send(msg)
         flash('Relatório por e-mail enviado com sucesso!', 'success')
     except Exception as e:
-        flash(f'Ocorreu um erro ao enviar o e-mail: {e}', 'danger')
+        print(f"--- ERRO AO ENVIAR E-MAIL: {e} ---")
+        flash('Ocorreu um erro ao enviar o e-mail. Verifique as credenciais e as configurações de segurança da sua conta. Mais detalhes no terminal.', 'danger')
     return redirect(url_for('home'))
 
 
-# --- ROTAS DA FROTA ---
+# --- ROTAS DE CRUD (FROTA, FUNCIONÁRIOS, ETC.) ---
+# O restante das suas rotas de CRUD continua aqui, sem alterações.
+# Cole todas as suas rotas a partir de '# --- ROTAS DA FROTA ---' aqui.
 @app.route('/frota')
 @login_required
 def frota():
@@ -196,7 +267,7 @@ def frota():
 @admin_required
 def adicionar_veiculo():
     if request.method == 'POST':
-        novo_veiculo = Veiculo(placa=request.form['placa'], modelo=request.form['modelo'], ano=int(request.form['ano']), km_inicial=int(request.form['km_inicial']))
+        novo_veiculo = Veiculo(placa=request.form['placa'].upper(), modelo=request.form['modelo'], ano=int(request.form['ano']), km_inicial=int(request.form['km_inicial']))
         db.session.add(novo_veiculo)
         db.session.commit()
         return redirect(url_for('frota'))
@@ -206,9 +277,10 @@ def adicionar_veiculo():
 @login_required
 @admin_required
 def editar_veiculo(id):
-    veiculo = Veiculo.query.get_or_404(id)
+    veiculo = db.session.get(Veiculo, id)
+    if not veiculo: return redirect(url_for('frota'))
     if request.method == 'POST':
-        veiculo.placa = request.form['placa']
+        veiculo.placa = request.form['placa'].upper()
         veiculo.modelo = request.form['modelo']
         veiculo.ano = int(request.form['ano'])
         veiculo.km_inicial = int(request.form['km_inicial'])
@@ -220,12 +292,12 @@ def editar_veiculo(id):
 @login_required
 @admin_required
 def excluir_veiculo(id):
-    veiculo = Veiculo.query.get_or_404(id)
-    db.session.delete(veiculo)
-    db.session.commit()
+    veiculo = db.session.get(Veiculo, id)
+    if veiculo:
+        db.session.delete(veiculo)
+        db.session.commit()
     return redirect(url_for('frota'))
 
-# --- ROTAS DE FUNCIONÁRIOS ---
 @app.route('/funcionarios')
 @login_required
 def funcionarios():
@@ -237,7 +309,14 @@ def funcionarios():
 @admin_required
 def adicionar_funcionario():
     if request.method == 'POST':
-        novo_funcionario = Funcionario(nome=request.form['nome'], funcao=request.form['funcao'], data_admissao=datetime.strptime(request.form['data_admissao'], '%Y-%m-%d').date(), data_nascimento=datetime.strptime(request.form['data_nascimento'], '%Y-%m-%d').date() if request.form['data_nascimento'] else None, cnh_numero=request.form['cnh_numero'], cnh_categoria=request.form['cnh_categoria'], salario_base=float(request.form['salario_base']), ajuda_custo_extra=float(request.form['ajuda_custo_extra']) if request.form['ajuda_custo_extra'] else 0.0)
+        novo_funcionario = Funcionario(
+            nome=request.form['nome'], funcao=request.form['funcao'],
+            data_admissao=datetime.strptime(request.form['data_admissao'], '%Y-%m-%d').date(),
+            data_nascimento=datetime.strptime(request.form['data_nascimento'], '%Y-%m-%d').date() if request.form.get('data_nascimento') else None,
+            cnh_numero=request.form['cnh_numero'], cnh_categoria=request.form['cnh_categoria'],
+            salario_base=float(request.form['salario_base']),
+            ajuda_custo_extra=float(request.form.get('ajuda_custo_extra', 0.0) or 0.0)
+        )
         db.session.add(novo_funcionario)
         db.session.commit()
         return redirect(url_for('funcionarios'))
@@ -247,17 +326,18 @@ def adicionar_funcionario():
 @login_required
 @admin_required
 def editar_funcionario(id):
-    func = Funcionario.query.get_or_404(id)
+    func = db.session.get(Funcionario, id)
+    if not func: return redirect(url_for('funcionarios'))
     if request.method == 'POST':
         func.nome = request.form['nome']
         func.funcao = request.form['funcao']
         func.data_admissao = datetime.strptime(request.form['data_admissao'], '%Y-%m-%d').date()
-        data_nascimento_str = request.form['data_nascimento']
+        data_nascimento_str = request.form.get('data_nascimento')
         func.data_nascimento = datetime.strptime(data_nascimento_str, '%Y-%m-%d').date() if data_nascimento_str else None
         func.cnh_numero = request.form['cnh_numero']
         func.cnh_categoria = request.form['cnh_categoria']
         func.salario_base = float(request.form['salario_base'])
-        func.ajuda_custo_extra = float(request.form['ajuda_custo_extra']) if request.form['ajuda_custo_extra'] else 0.0
+        func.ajuda_custo_extra = float(request.form.get('ajuda_custo_extra', 0.0) or 0.0)
         db.session.commit()
         return redirect(url_for('funcionarios'))
     return render_template('editar_funcionario.html', funcionario=func)
@@ -266,12 +346,12 @@ def editar_funcionario(id):
 @login_required
 @admin_required
 def excluir_funcionario(id):
-    func = Funcionario.query.get_or_404(id)
-    db.session.delete(func)
-    db.session.commit()
+    func = db.session.get(Funcionario, id)
+    if func:
+        db.session.delete(func)
+        db.session.commit()
     return redirect(url_for('funcionarios'))
 
-# --- ROTAS DE ABASTECIMENTO ---
 @app.route('/abastecimentos')
 @login_required
 def abastecimentos():
@@ -283,7 +363,11 @@ def abastecimentos():
 @admin_required
 def adicionar_abastecimento():
     if request.method == 'POST':
-        novo_abastecimento = Abastecimento(id_veiculo=int(request.form['id_veiculo']), id_funcionario=int(request.form['id_funcionario']), data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(), km_odometro=int(request.form['km_odometro']), litros=float(request.form['litros']), valor_total=float(request.form['valor_total']))
+        novo_abastecimento = Abastecimento(
+            id_veiculo=int(request.form['id_veiculo']), id_funcionario=int(request.form['id_funcionario']),
+            data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+            km_odometro=int(request.form['km_odometro']), litros=float(request.form['litros']), valor_total=float(request.form['valor_total'])
+        )
         db.session.add(novo_abastecimento)
         db.session.commit()
         return redirect(url_for('abastecimentos'))
@@ -295,7 +379,8 @@ def adicionar_abastecimento():
 @login_required
 @admin_required
 def editar_abastecimento(id):
-    abast = Abastecimento.query.get_or_404(id)
+    abast = db.session.get(Abastecimento, id)
+    if not abast: return redirect(url_for('abastecimentos'))
     if request.method == 'POST':
         abast.id_veiculo = int(request.form['id_veiculo'])
         abast.id_funcionario = int(request.form['id_funcionario'])
@@ -313,12 +398,12 @@ def editar_abastecimento(id):
 @login_required
 @admin_required
 def excluir_abastecimento(id):
-    abast = Abastecimento.query.get_or_404(id)
-    db.session.delete(abast)
-    db.session.commit()
+    abast = db.session.get(Abastecimento, id)
+    if abast:
+        db.session.delete(abast)
+        db.session.commit()
     return redirect(url_for('abastecimentos'))
 
-# --- ROTAS DE MANUTENÇÕES ---
 @app.route('/manutencoes')
 @login_required
 def manutencoes():
@@ -330,7 +415,11 @@ def manutencoes():
 @admin_required
 def adicionar_manutencao():
     if request.method == 'POST':
-        nova_manutencao = Manutencao(id_veiculo=int(request.form['id_veiculo']), data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(), descricao_servico=request.form['descricao_servico'], custo=float(request.form['custo']), km_odometro=int(request.form['km_odometro']))
+        nova_manutencao = Manutencao(
+            id_veiculo=int(request.form['id_veiculo']), data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+            descricao_servico=request.form['descricao_servico'], custo=float(request.form['custo']),
+            km_odometro=int(request.form['km_odometro'])
+        )
         db.session.add(nova_manutencao)
         db.session.commit()
         return redirect(url_for('manutencoes'))
@@ -341,7 +430,8 @@ def adicionar_manutencao():
 @login_required
 @admin_required
 def editar_manutencao(id):
-    manutencao = Manutencao.query.get_or_404(id)
+    manutencao = db.session.get(Manutencao, id)
+    if not manutencao: return redirect(url_for('manutencoes'))
     if request.method == 'POST':
         manutencao.id_veiculo = int(request.form['id_veiculo'])
         manutencao.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
@@ -357,12 +447,12 @@ def editar_manutencao(id):
 @login_required
 @admin_required
 def excluir_manutencao(id):
-    manutencao = Manutencao.query.get_or_404(id)
-    db.session.delete(manutencao)
-    db.session.commit()
+    manutencao = db.session.get(Manutencao, id)
+    if manutencao:
+        db.session.delete(manutencao)
+        db.session.commit()
     return redirect(url_for('manutencoes'))
 
-# --- ROTAS DE DESPESAS GERAIS ---
 @app.route('/despesas')
 @login_required
 def despesas():
@@ -374,7 +464,10 @@ def despesas():
 @admin_required
 def adicionar_despesa():
     if request.method == 'POST':
-        nova_despesa = DespesaGeral(data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(), categoria=request.form['categoria'], descricao=request.form['descricao'], valor=float(request.form['valor']))
+        nova_despesa = DespesaGeral(
+            data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(), categoria=request.form['categoria'],
+            descricao=request.form['descricao'], valor=float(request.form['valor'])
+        )
         db.session.add(nova_despesa)
         db.session.commit()
         return redirect(url_for('despesas'))
@@ -384,7 +477,8 @@ def adicionar_despesa():
 @login_required
 @admin_required
 def editar_despesa(id):
-    despesa = DespesaGeral.query.get_or_404(id)
+    despesa = db.session.get(DespesaGeral, id)
+    if not despesa: return redirect(url_for('despesas'))
     if request.method == 'POST':
         despesa.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
         despesa.categoria = request.form['categoria']
@@ -398,12 +492,12 @@ def editar_despesa(id):
 @login_required
 @admin_required
 def excluir_despesa(id):
-    despesa = DespesaGeral.query.get_or_404(id)
-    db.session.delete(despesa)
-    db.session.commit()
+    despesa = db.session.get(DespesaGeral, id)
+    if despesa:
+        db.session.delete(despesa)
+        db.session.commit()
     return redirect(url_for('despesas'))
 
-# --- ROTAS DE RECEITAS ---
 @app.route('/receitas')
 @login_required
 def receitas():
@@ -416,7 +510,11 @@ def receitas():
 def adicionar_receita():
     if request.method == 'POST':
         id_veiculo_form = request.form.get('id_veiculo')
-        nova_receita = Receita(data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(), descricao=request.form['descricao'], valor=float(request.form['valor']), id_veiculo=int(id_veiculo_form) if id_veiculo_form else None)
+        nova_receita = Receita(
+            data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(), descricao=request.form['descricao'],
+            valor=float(request.form['valor']),
+            id_veiculo=int(id_veiculo_form) if id_veiculo_form and id_veiculo_form.isdigit() else None
+        )
         db.session.add(nova_receita)
         db.session.commit()
         return redirect(url_for('receitas'))
@@ -427,13 +525,14 @@ def adicionar_receita():
 @login_required
 @admin_required
 def editar_receita(id):
-    receita = Receita.query.get_or_404(id)
+    receita = db.session.get(Receita, id)
+    if not receita: return redirect(url_for('receitas'))
     if request.method == 'POST':
         id_veiculo_form = request.form.get('id_veiculo')
         receita.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
         receita.descricao = request.form['descricao']
         receita.valor = float(request.form['valor'])
-        receita.id_veiculo = int(id_veiculo_form) if id_veiculo_form else None
+        receita.id_veiculo = int(id_veiculo_form) if id_veiculo_form and id_veiculo_form.isdigit() else None
         db.session.commit()
         return redirect(url_for('receitas'))
     veiculos_disp = Veiculo.query.all()
@@ -443,7 +542,12 @@ def editar_receita(id):
 @login_required
 @admin_required
 def excluir_receita(id):
-    receita = Receita.query.get_or_404(id)
-    db.session.delete(receita)
-    db.session.commit()
+    receita = db.session.get(Receita, id)
+    if receita:
+        db.session.delete(receita)
+        db.session.commit()
     return redirect(url_for('receitas'))
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

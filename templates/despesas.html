@@ -36,9 +36,11 @@
                     {% if current_user.role == 'admin' %}
                     <td>
                         <div class="d-flex gap-2">
-                            <a href="{{ url_for('editar_despesa', id=despesa.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                            <a href="{{ url_for('editar_despesa', id=despesa.id) }}"
+                                class="btn btn-sm btn-warning">Editar</a>
                             <form method="POST" action="{{ url_for('excluir_despesa', id=despesa.id) }}">
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este registro?')">Excluir</button>
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('Tem certeza que deseja excluir este registro?')">Excluir</button>
                             </form>
                         </div>
                     </td>

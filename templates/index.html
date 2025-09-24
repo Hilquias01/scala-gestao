@@ -62,18 +62,18 @@
 <div class="row">
     <div class="col-lg-6 mb-4">
         <div class="card shadow-sm">
-            <div class="card-header">
+            <div class="card-header fw-bold">
                 Gastos por Categoria (Mês)
             </div>
             <div class="card-body">
                 {% if chart_data %}
-                    <div style="height: 350px;"> 
-                        <canvas id="gastosChart"></canvas>
-                    </div>
+                <div style="height: 350px;">
+                    <canvas id="gastosChart"></canvas>
+                </div>
                 {% else %}
-                    <div class="alert alert-info text-center">
-                        Não há dados de despesas para o mês atual.
-                    </div>
+                <div class="alert alert-info text-center">
+                    Não há dados de despesas para o mês atual.
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -81,7 +81,7 @@
 
     <div class="col-lg-6 mb-4">
         <div class="card shadow-sm">
-            <div class="card-header">
+            <div class="card-header fw-bold">
                 Receitas vs. Despesas (Mês)
             </div>
             <div class="card-body">
@@ -97,58 +97,66 @@
 {% block scripts %}
 {% if chart_data %}
 <script>
-    const ctxGastos = document.getElementById('gastosChart');
-    new Chart(ctxGastos, {
-        type: 'doughnut',
-        data: {
-            labels: {{ chart_labels|tojson }},
-            datasets: [{
-                label: 'Gastos em R$',
-                data: {{ chart_data|tojson }},
-                backgroundColor: ['#0d2a4e', '#f5b32a', '#3e5d8a', '#fcd34d', '#6f8ab7'],
-                hoverOffset: 4
-            }]
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctxGastos = document.getElementById('gastosChart');
+        if (ctxGastos) {
+            new Chart(ctxGastos, {
+                type: 'doughnut',
+                data: {
+                    labels: {{ chart_labels|tojson }},
+                    datasets: [{
+                        label: 'Gastos em R$',
+                        data: {{ chart_data|tojson }},
+                        backgroundColor: ['#0d2a4e', '#f5b32a', '#3e5d8a', '#fcd34d', '#6f8ab7'],
+                        hoverOffset: 4
+                    }]
+                }
+            });
         }
     });
 </script>
 {% endif %}
 
 <script>
-    const ctxReceitasDespesas = document.getElementById('receitasDespesasChart');
-    new Chart(ctxReceitasDespesas, {
-        type: 'bar', // Tipo de gráfico de barras
-        data: {
-            labels: ['Receitas', 'Despesas'],
-            datasets: [{
-                label: 'Valor em R$',
-                data: [
-                    {{ total_receitas_mes }}, 
-                    {{ total_gastos_mes }}
-                ],
-                backgroundColor: [
-                    'rgba(25, 135, 84, 0.6)',  // Verde para receitas
-                    'rgba(220, 53, 69, 0.6)'    // Vermelho para despesas
-                ],
-                borderColor: [
-                    'rgba(25, 135, 84, 1)',
-                    'rgba(220, 53, 69, 1)'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctxReceitasDespesas = document.getElementById('receitasDespesasChart');
+        if (ctxReceitasDespesas) {
+            new Chart(ctxReceitasDespesas, {
+                type: 'bar',
+                data: {
+                    labels: ['Receitas', 'Despesas'],
+                    datasets: [{
+                        label: 'Valor em R$',
+                        data: [
+                            {{ total_receitas_mes }},
+                            {{ total_gastos_mes }}
+                        ],
+                        backgroundColor: [
+                            'rgba(25, 135, 84, 0.6)',
+                            'rgba(220, 53, 69, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(25, 135, 84, 1)',
+                            'rgba(220, 53, 69, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
                 }
-            },
-            plugins: {
-                legend: {
-                    display: false // Não precisa de legenda para apenas 2 barras
-                }
-            }
+            });
         }
     });
 </script>

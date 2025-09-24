@@ -1,89 +1,81 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Scala Gestão{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-
-<body class="bg-light">
-
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #0d2a4e;">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('home') }}">Scala Gestão</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 {% if current_user.is_authenticated %}
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('home') }}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('frota') }}">Frota</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('funcionarios') }}">Funcionários</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('abastecimentos') }}">Abastecimentos</a>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Financeiro
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('abastecimentos') }}">Abastecimentos</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('manutencoes') }}">Manutenções</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('despesas') }}">Despesas Gerais</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('receitas') }}">Receitas</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('manutencoes') }}">Manutenções</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('despesas') }}">Despesas</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('receitas') }}">Receitas</a>
+                        <a class="nav-link" href="{{ url_for('relatorios') }}">Relatórios</a>
                     </li>
                 </ul>
-
-                <ul class="navbar-nav ms-auto">
-                    {% if current_user.is_authenticated %}
-                    {% if current_user.role == 'admin' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('enviar_relatorio') }}"
-                            onclick="return confirm('Deseja enviar o relatório do mês passado por e-mail?')">Enviar
-                            Relatório</a>
+                <ul class="navbar-nav">
+                     {% if current_user.role == 'admin' %}
+                     <li class="nav-item">
+                        <a href="{{ url_for('enviar_relatorio') }}" class="btn btn-sm btn-outline-warning me-2" onclick="return confirm('Isso enviará o relatório do mês passado para o seu e-mail. Deseja continuar?')">Enviar Relatório Mês Anterior</a>
                     </li>
                     {% endif %}
-                    {% else %}
-                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Sair ({{ current_user.username }})</a>
+                    </li>
                 </ul>
-
-
-
                 {% endif %}
-
-                <ul class="navbar-nav ms-auto">
-                    {% if current_user.is_authenticated %}
-                    <li class="nav-item">
-                        <span class="navbar-text me-3">
-                            Olá, {{ current_user.username }} ({{ current_user.role }})
-                        </span>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
-                    </li>
-                    {% else %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('login') }}">Login</a>
-                    </li>
-                    {% endif %}
-                </ul>
             </div>
         </div>
     </nav>
 
-    <main class="container mt-4 mb-5">
+    <main class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
         {% block content %}{% endblock %}
     </main>
-    <script src="/static/js/main.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
     {% block scripts %}{% endblock %}
 </body>
-
 </html>
